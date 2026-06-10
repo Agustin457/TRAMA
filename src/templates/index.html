@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trama Buenos Aires - PR Control de Catálogo</title>
+    <!-- Outfit Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #080c10;
+            --card-bg: rgba(17, 22, 28, 0.75);
+            --border-color: rgba(45, 54, 66, 0.6);
+            --border-hover: rgba(88, 166, 255, 0.45);
+            --accent-color: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.15);
+            
+            --success-color: #2ea44f;
+            --success-glow: rgba(46, 164, 79, 0.15);
+            --danger-color: #f85149;
+            --danger-glow: rgba(248, 81, 73, 0.12);
+            --warning-color: #d29922;
+            
+            --diff-del-bg: rgba(248, 81, 73, 0.12);
+            --diff-del-border: rgba(248, 81, 73, 0.3);
+            --diff-add-bg: rgba(63, 185, 80, 0.12);
+            --diff-add-border: rgba(63, 185, 80, 0.3);
+            
+            --text-color: #c9d1d9;
+            --text-muted: #8b949e;
+            --white: #ffffff;
+            --glass-blur: blur(16px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-image: 
+                radial-gradient(circle at 5% 10%, rgba(88, 166, 255, 0.05), transparent 450px),
+                radial-gradient(circle at 95% 90%, rgba(46, 164, 79, 0.035), transparent 450px);
+            background-attachment: fixed;
+            padding: 20px 16px;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            font-size: 2.2rem;
+            color: var(--accent-color);
+            text-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .brand-info h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--white);
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+        }
+
+        .brand-info p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Nav Tabs */
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            border-radius: 10px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-color);
+            color: var(--bg-color);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .tab-btn:not(.active):hover {
+            color: var(--white);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        main {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .view-content {
+            display: none;
+            animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Container */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.45);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+        }
+
+        .card-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title i {
+            color: var(--accent-color);
+        }
+
+        .badge-count {
+            background: var(--accent-glow);
+            color: var(--accent-color);
+            border: 1px solid var(--border-color);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Unifications list */
+        .unifications-list {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* PR Card Layout */
+        .pr-card {
+            background: rgba(22, 27, 34, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .pr-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+        }
+
+        .pr-header {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pr-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pr-badge {
+            background: #a855f7;
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .pr-title {
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        .pr-score {
+            font-size: 0.85rem;
+            color: #d8b4fe;
+            background: rgba(168, 85, 247, 0.12);
+            padding: 3px 8px;
+            border-radius: 20px;
+            border: 1px solid rgba(168, 85, 247, 0.25);
+        }
+
+        /* Git Diff View CSS */
+        .diff-view {
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            background: #0d1117;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .diff-header-line {
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.01);
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .diff-line {
+            display: grid;
+            grid-template-columns: 35px 120px 1fr;
+            padding: 6px 20px;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.01);
+        }
+
+        .diff-indicator {
+            user-select: none;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .diff-field-name {
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+
+        .diff-value {
+            color: var(--text-color);
+            word-break: break-all;
+        }
+
+        /* Deletion row (Red style) */
+        .diff-line.deletion {
+            background-color: var(--diff-del-bg);
+            border-left: 3px solid var(--danger-color);
+        }
+        .diff-line.deletion .diff-indicator {
+            color: var(--danger-color);
+        }
+        .diff-line.deletion .diff-value {
+            text-decoration: line-through;
+            opacity: 0.75;
+        }
+
+        /* Addition row (Green style + interactive inputs) */
+        .diff-line.addition {
+            background-color: var(--diff-add-bg);
+            border-left: 3px solid var(--success-color);
+        }
+        .diff-line.addition .diff-indicator {
+            color: var(--success-color);
+        }
+        
+        /* Interactive Input inside PR */
+        .diff-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--diff-add-border);
+            border-radius: 5px;
+            padding: 5px 10px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .diff-input:focus {
+            outline: none;
+            background: rgba(0, 0, 0, 0.4);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        /* Summary of impact under the PR diff */
+        .pr-summary-bar {
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .pr-change-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        
+        .pr-change-badge.up {
+            background: var(--danger-glow);
+            color: #ff7b72;
+            border: 1px solid rgba(218, 54, 55, 0.2);
+        }
+
+        .pr-change-badge.down {
+            background: var(--success-glow);
+            color: #56d364;
+            border: 1px solid rgba(46, 164, 79, 0.2);
+        }
+
+        .pr-change-badge.no-change {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Button row at the bottom of PR */
+        .pr-actions {
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .pr-actions {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: var(--white);
+            box-shadow: 0 4px 10px rgba(46, 164, 79, 0.2);
+        }
+
+        .btn-success:hover {
+            background-color: #388e3c;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent-color);
+            color: var(--white);
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        /* Empty State style */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: var(--accent-color);
+            margin-bottom: 14px;
+            display: block;
+        }
+
+        /* Scanner tab elements */
+        .scanner-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .scanner-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        #reader {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border-color) !important;
+            background: #000;
+        }
+
+        .manual-search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-control {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .scanner-info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Toast notifications */
+        #toast {
+            visibility: hidden;
+            min-width: 300px;
+            background-color: #161b22;
+            border: 1px solid var(--accent-color);
+            color: var(--white);
+            text-align: center;
+            border-radius: 10px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        #toast.show {
+            visibility: visible;
+            animation: fadein 0.4s, fadeout 0.4s 2.6s;
+        }
+
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 30px; opacity: 1;}
+        }
+
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo"><i class="fa-solid fa-code-pull-request"></i></div>
+            <div class="brand-info">
+                <h1>TRAMA Buenos Aires</h1>
+                <p>Consola de Pull Requests (PRs) de Catálogo Maestro</p>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('unify-tab')">
+                <i class="fa-solid fa-code-compare"></i> Bandeja PRs
+                <span class="badge-count" id="unifyBadge">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('scanner-tab')">
+                <i class="fa-solid fa-barcode"></i> Buscar / Escanear
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- TAB 1: PENDING PRs BANNER -->
+        <div id="unify-tab" class="view-content active">
+            <div class="card">
+                <div class="card-header-bar">
+                    <div class="card-title">
+                        <i class="fa-solid fa-code-pull-request"></i> Propuestas de Unificación de Proveedores
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        Mezcla datos de proveedores al catálogo editando inline cada cambio.
+                    </div>
+                </div>
+                
+                <div class="unifications-list" id="unifyContainer">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>Buscando Pull Requests de unificación pendientes...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: CAMERA ESCANNER & SEARCH -->
+        <div id="scanner-tab" class="view-content">
+            <div class="scanner-layout">
+                <div class="card">
+                    <div class="card-header-bar">
+                        <div class="card-title">
+                            <i class="fa-solid fa-camera"></i> Escáner de Barras EAN
+                        </div>
+                    </div>
+                    <div id="reader"></div>
+                </div>
+                
+                <div class="scanner-info-panel">
+                    <!-- Manual Lookup -->
+                    <div class="card">
+                        <div class="card-title">
+                            <i class="fa-solid fa-magnifying-glass"></i> Búsqueda Directa
+                        </div>
+                        <div class="manual-search-box">
+                            <input type="text" class="form-control" id="searchBarcodeVal" placeholder="Ingresa código o SKU...">
+                            <button class="btn btn-outline" style="width: auto;" onclick="runManualSearch()">Buscar</button>
+                        </div>
+                    </div>
+
+                    <!-- Scan Results panel -->
+                    <div class="card" id="scannerResultCard" style="display: none;">
+                        <!-- Product Found -->
+                        <div id="prodFoundBox" style="display: none;">
+                            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 12px;">
+                                <div id="scanResName" style="font-size: 1.15rem; font-weight: 600; color: var(--white);">--</div>
+                                <span id="scanResSku" class="pr-badge" style="background:#58a6ff; margin-top: 6px; display: inline-block;">--</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costo</div>
+                                    <div style="font-size: 1.1rem; font-weight: 600;" id="scanResCosto">$0.00</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Venta (PVP)</div>
+                                    <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-color);" id="scanResVenta">$0.00</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                Marca: <strong id="scanResBrand" style="color: var(--text-color);">--</strong> | Categoría: <strong id="scanResCat" style="color: var(--text-color);">--</strong>
+                            </div>
+                        </div>
+
+                        <!-- Product Not Found -->
+                        <div id="prodNotFoundBox" style="display: none;">
+                            <div style="color: #ff7b72; font-weight: 600; font-size: 1.05rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-circle-exclamation"></i> No Registrado
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                                El código <strong id="scannedNotFoundCode" style="color: var(--white);"></strong> no existe. Créalo desde aquí:
+                            </p>
+                            <form id="scanNewProdForm" onsubmit="saveScannedProduct(event)">
+                                <input type="hidden" id="scanFormBarcode">
+                                <div style="margin-bottom: 12px;">
+                                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">SKU Maestro</label>
+                                    <input type="text" class="form-control" id="scanFormSku" required placeholder="Ej. ESC-BIC-CRI-AZU">
+                                </div>
+                                <div style="margin-bottom: 12px;">
+                                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Nombre del Producto</label>
+                                    <input type="text" class="form-control" id="scanFormName" required placeholder="Ej. LAPICERA BIC AZUL">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Marca</label>
+                                        <input type="text" class="form-control" id="scanFormBrand" required placeholder="Ej. BIC">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Categoría</label>
+                                        <input type="text" class="form-control" id="scanFormCat" required placeholder="Ej. ESCRITURA">
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Costo ($)</label>
+                                        <input type="number" step="0.01" class="form-control" id="scanFormCosto" required value="0.00">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Margen</label>
+                                        <input type="number" step="0.01" class="form-control" id="scanFormMargen" required value="0.40">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success" style="width: 100%;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Crear Producto
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast elements -->
+    <div id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Cambios aplicados</span>
+    </div>
+
+    <!-- html5-qrcode CDN -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <script>
+        let html5QrcodeScanner;
+
+        // Cambiar entre pestañas
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-content').forEach(view => {
+                view.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            if (tabId === 'scanner-tab') {
+                initScanner();
+            } else {
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.clear().catch(err => console.error("Error clearing scanner", err));
+                }
+                loadPendingMatches();
+            }
+        }
+
+        // Mostrar Toast Notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toastMsg");
+            const toastIcon = toast.querySelector("i");
+            
+            toastMsg.textContent = message;
+            if (isError) {
+                toast.style.borderColor = "var(--danger-color)";
+                toastIcon.className = "fa-solid fa-circle-exclamation";
+                toastIcon.style.color = "var(--danger-color)";
+            } else {
+                toast.style.borderColor = "var(--accent-color)";
+                toastIcon.className = "fa-solid fa-circle-check";
+                toastIcon.style.color = "var(--success-color)";
+            }
+            
+            toast.className = "show";
+            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // Recalcular PVP en tiempo real en la UI del Diff
+        function recalculateDiffPvp(matchId) {
+            const costInput = document.getElementById(`input-costo-${matchId}`);
+            const marginInput = document.getElementById(`input-margen-${matchId}`);
+            const pvpValueSpan = document.getElementById(`pvp-val-${matchId}`);
+            
+            if (costInput && marginInput && pvpValueSpan) {
+                const cost = parseFloat(costInput.value) || 0;
+                const margin = parseFloat(marginInput.value) || 0;
+                const pvp = cost * (1 + margin);
+                pvpValueSpan.textContent = `$${pvp.toFixed(2)}`;
+            }
+        }
+
+        // Cargar sugerencias de unificación como "Pull Requests (PR)"
+        async function loadPendingMatches() {
+            const container = document.getElementById("unifyContainer");
+            const badge = document.getElementById("unifyBadge");
+            
+            try {
+                const response = await fetch('/api/coincidencias');
+                const matches = await response.json();
+                
+                badge.textContent = matches.length;
+                
+                if (matches.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i>
+                            <h3>¡Bandeja de PRs Vacía!</h3>
+                            <p>Todos los productos de los proveedores han sido deduplicados y unificados.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                matches.forEach(m => {
+                    const provLower = m.nombre_proveedor.toLowerCase();
+                    
+                    // Diferencias financieras
+                    const diffCost = m.costo_calculado_proveedor - m.costo_actual_catalogo;
+                    const diffPct = m.costo_actual_catalogo > 0 ? (diffCost / m.costo_actual_catalogo * 100).toFixed(1) : 0;
+                    
+                    let diffBadge = '';
+                    if (diffCost > 0) {
+                        diffBadge = `<span class="pr-change-badge up"><i class="fa-solid fa-arrow-trend-up"></i> +$${diffCost.toFixed(2)} (+${diffPct}%) Costo</span>`;
+                    } else if (diffCost < 0) {
+                        diffBadge = `<span class="pr-change-badge down"><i class="fa-solid fa-arrow-trend-down"></i> -$${Math.abs(diffCost).toFixed(2)} (${diffPct}%) Costo</span>`;
+                    } else {
+                        diffBadge = `<span class="pr-change-badge no-change">Sin cambios</span>`;
+                    }
+
+                    // Renderizar cada coincidencia como un Diff PR interactivo
+                    html += `
+                        <div class="pr-card" id="pr-card-${m.id}">
+                            <div class="pr-header">
+                                <div class="pr-info">
+                                    <span class="pr-badge">PR #${m.id}</span>
+                                    <span class="pr-title">Unificar proveedor <strong>${m.nombre_proveedor}</strong> a SKU Maestro <strong>${m.master_sku_sugerido}</strong></span>
+                                </div>
+                                <span class="pr-score"><i class="fa-solid fa-circle-half-stroke"></i> Similitud: ${m.similitud}%</span>
+                            </div>
+                            
+                            <!-- Git-like Interactive Diff View -->
+                            <div class="diff-view">
+                                <div class="diff-header-line">
+                                    <span>@@ Comparación de Atributos: Catálogo Maestro (-) vs Propuesta del Proveedor (+) @@</span>
+                                    <span>Editable</span>
+                                </div>
+                                
+                                <!-- NOMBRE DIFF -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">Nombre</span>
+                                    <span class="diff-value">${m.nombre_catalogo}</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">Nombre</span>
+                                    <div class="diff-value">
+                                        <input type="text" class="diff-input" id="input-nombre-${m.id}" value="${m.nombre_catalogo}">
+                                    </div>
+                                </div>
+
+                                <!-- MARCA DIFF -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">Marca</span>
+                                    <span class="diff-value">BIC (Detectado o Anterior)</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">Marca</span>
+                                    <div class="diff-value">
+                                        <input type="text" class="diff-input" id="input-marca-${m.id}" value="${m.nombre_catalogo.split(' ')[0]}">
+                                    </div>
+                                </div>
+
+                                <!-- BARCODE DIFF -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">Código Barras</span>
+                                    <span class="diff-value">SIN BARRAS</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">Código Barras</span>
+                                    <div class="diff-value">
+                                        <input type="text" class="diff-input" id="input-barras-${m.id}" value="${m.codigo_proveedor.length > 8 ? m.codigo_proveedor : ''}" placeholder="EAN13 Opcional">
+                                    </div>
+                                </div>
+                                
+                                <!-- COSTO DIFF -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">Costo</span>
+                                    <span class="diff-value">$${m.costo_actual_catalogo.toFixed(2)}</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">Costo</span>
+                                    <div class="diff-value">
+                                        <input type="number" step="0.01" class="diff-input" id="input-costo-${m.id}" value="${m.costo_calculado_proveedor.toFixed(2)}" oninput="recalculateDiffPvp(${m.id})">
+                                    </div>
+                                </div>
+
+                                <!-- MARGEN DIFF -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">Margen</span>
+                                    <span class="diff-value">40.0% (0.40)</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">Margen</span>
+                                    <div class="diff-value">
+                                        <input type="number" step="0.01" class="diff-input" id="input-margen-${m.id}" value="0.40" oninput="recalculateDiffPvp(${m.id})">
+                                    </div>
+                                </div>
+
+                                <!-- PVP ESTIMADO (CALCULADO DINÁMICAMENTE) -->
+                                <div class="diff-line deletion">
+                                    <span class="diff-indicator">-</span>
+                                    <span class="diff-field-name">PVP Actual</span>
+                                    <span class="diff-value">$${m.venta_actual_catalogo.toFixed(2)}</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="diff-indicator">+</span>
+                                    <span class="diff-field-name">PVP Nuevo</span>
+                                    <div class="diff-value" style="font-weight:700; color:var(--accent-color); padding: 5px 0;">
+                                        <span id="pvp-val-${m.id}">$${(m.costo_calculado_proveedor * 1.40).toFixed(2)}</span> (Recalculado)
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Impact Summary Bar -->
+                            <div class="pr-summary-bar">
+                                <div>
+                                    Proveedor: <strong style="color:var(--white); text-transform:uppercase;">${m.nombre_proveedor}</strong> | Código original: <strong>${m.codigo_provider = m.codigo_proveedor}</strong>
+                                </div>
+                                ${diffBadge}
+                            </div>
+                            
+                            <!-- PR Actions Row -->
+                            <div class="pr-actions">
+                                <button class="btn btn-success" onclick="mergePullRequest(${m.id})">
+                                    <i class="fa-solid fa-code-merge"></i> Confirmar & Mezclar (Merge PR)
+                                </button>
+                                <button class="btn btn-outline" onclick="splitProductAsNew(${m.producto_proveedor_id}, ${m.id})">
+                                    <i class="fa-solid fa-code-branch"></i> Rama Nueva (Split New SKU)
+                                </button>
+                                <button class="btn btn-outline" style="border-color: rgba(248,81,73,0.3); color:#ff7b72;" onclick="rejectPullRequest(${m.id})">
+                                    <i class="fa-solid fa-circle-xmark"></i> Cerrar PR sin Mezclar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (err) {
+                console.error("Error al cargar la bandeja de PRs", err);
+                container.innerHTML = `
+                    <div class="empty-state" style="border-color: var(--danger-color);">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger-color);"></i>
+                        <h3>Error de Conexión</h3>
+                        <p>No se pudo conectar al motor de Pull Requests del catálogo.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Ejecutar Mezcla (Merge PR) enviando los Overrides de los inputs editables
+        async function mergePullRequest(matchId) {
+            const nombre = document.getElementById(`input-nombre-${matchId}`).value.trim();
+            const marca = document.getElementById(`input-marca-${matchId}`).value.trim();
+            const barras = document.getElementById(`input-barras-${matchId}`).value.trim();
+            const costo = parseFloat(document.getElementById(`input-costo-${matchId}`).value);
+            const margen = parseFloat(document.getElementById(`input-margen-${matchId}`).value);
+            
+            try {
+                const response = await fetch(`/api/coincidencias/${matchId}/resolver`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'APROBAR',
+                        nombre_normalizado: nombre,
+                        marca: marca,
+                        codigo_barras: barras !== "" ? barras : null,
+                        precio_costo: costo,
+                        margen_ganancia: margen
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast(`¡PR #${matchId} mezclado con éxito en el Catálogo Maestro!`);
+                    animateRemoveCard(matchId);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || "Error al realizar el merge", true);
+                }
+            } catch (err) {
+                showToast("Fallo al conectar con el servidor", true);
+            }
+        }
+
+        // Rechazar Pull Request (Cerrar)
+        async function rejectPullRequest(matchId) {
+            try {
+                const response = await fetch(`/api/coincidencias/${matchId}/resolver`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'RECHAZAR' })
+                });
+                
+                if (response.ok) {
+                    showToast(`PR #${matchId} cerrado y descartado`);
+                    animateRemoveCard(matchId);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || "Error al descartar el PR", true);
+                }
+            } catch (err) {
+                showToast("Fallo al conectar con el servidor", true);
+            }
+        }
+
+        // Separar producto como nuevo (Split)
+        async function splitProductAsNew(prodProvId, matchId) {
+            try {
+                const response = await fetch(`/api/proveedor-producto/${prodProvId}/crear-nuevo`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const res = await response.json();
+                    showToast(`PR desvinculado. Nuevo SKU registrado: ${res.new_sku}`);
+                    animateRemoveCard(matchId);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || "Error al registrar como nuevo SKU", true);
+                }
+            } catch (err) {
+                showToast("Fallo al conectar con el servidor", true);
+            }
+        }
+
+        function animateRemoveCard(matchId) {
+            const card = document.getElementById(`pr-card-${matchId}`);
+            if (card) {
+                card.style.transform = "translateY(20px) scale(0.96)";
+                card.style.opacity = "0";
+                setTimeout(() => {
+                    card.remove();
+                    loadPendingMatches();
+                }, 250);
+            }
+        }
+
+        // Búsqueda Manual
+        function runManualSearch() {
+            const val = document.getElementById("searchBarcodeVal").value.trim();
+            if (val === "") {
+                showToast("Ingresa un SKU o código de barras válido", true);
+                return;
+            }
+            queryBarcode(val);
+        }
+
+        // Consultar producto por código de barras o SKU
+        async function queryBarcode(barcode) {
+            const resultCard = document.getElementById("scannerResultCard");
+            const foundBox = document.getElementById("prodFoundBox");
+            const notFoundBox = document.getElementById("prodNotFoundBox");
+            
+            resultCard.style.display = "block";
+            foundBox.style.display = "none";
+            notFoundBox.style.display = "none";
+            
+            try {
+                const response = await fetch(`/api/producto/${barcode}`);
+                if (response.ok) {
+                    const prod = await response.json();
+                    
+                    document.getElementById("scanResName").textContent = prod.nombre_normalizado;
+                    document.getElementById("scanResSku").textContent = "SKU: " + prod.master_sku;
+                    document.getElementById("scanResCosto").textContent = `$${prod.precio_costo.toFixed(2)}`;
+                    document.getElementById("scanResVenta").textContent = `$${prod.precio_venta.toFixed(2)}`;
+                    document.getElementById("scanResBrand").textContent = prod.marca;
+                    document.getElementById("scanResCat").textContent = prod.categoria;
+                    
+                    foundBox.style.display = "block";
+                    showToast("Producto encontrado en el Catálogo Maestro");
+                } else {
+                    document.getElementById("scannedNotFoundCode").textContent = barcode;
+                    document.getElementById("scanFormBarcode").value = barcode;
+                    // Sugerir SKU basado en código
+                    document.getElementById("scanFormSku").value = "SKU-" + barcode.substring(Math.max(0, barcode.length - 6));
+                    document.getElementById("scanFormName").value = "";
+                    document.getElementById("scanFormBrand").value = "";
+                    document.getElementById("scanFormCat").value = "VARIOS";
+                    document.getElementById("scanFormCosto").value = "0.00";
+                    document.getElementById("scanFormMargen").value = "0.40";
+                    
+                    notFoundBox.style.display = "block";
+                    showToast("El código no existe en el Catálogo Maestro", true);
+                }
+            } catch (err) {
+                showToast("Error al conectar con la API de consulta", true);
+            }
+        }
+
+        // Guardar producto desde el formulario del escáner
+        async function saveScannedProduct(event) {
+            event.preventDefault();
+            const sku = document.getElementById("scanFormSku").value.trim();
+            const name = document.getElementById("scanFormName").value.trim().toUpperCase();
+            const brand = document.getElementById("scanFormBrand").value.trim().toUpperCase();
+            const cat = document.getElementById("scanFormCat").value.trim().toUpperCase();
+            const barcode = document.getElementById("scanFormBarcode").value;
+            const cost = parseFloat(document.getElementById("scanFormCosto").value);
+            const margin = parseFloat(document.getElementById("scanFormMargen").value);
+
+            try {
+                const response = await fetch('/api/producto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        master_sku: sku,
+                        nombre_normalizado: name,
+                        marca: brand,
+                        categoria: cat,
+                        codigo_barras: barcode,
+                        precio_costo: cost,
+                        margen_ganancia: margin
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("¡Producto registrado en el Catálogo Maestro!");
+                    queryBarcode(barcode);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || "Error al guardar producto", true);
+                }
+            } catch (err) {
+                showToast("Error de conexión al guardar producto", true);
+            }
+        }
+
+        // Inicializar Escáner de Cámara
+        function initScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { 
+                    fps: 12, 
+                    qrbox: { width: 260, height: 160 },
+                    aspectRatio: 1.777778,
+                    showTorchButtonIfSupported: true
+                },
+                false
+            );
+            
+            html5QrcodeScanner.render(
+                (decodedText) => {
+                    showToast("Escaneado: " + decodedText);
+                    queryBarcode(decodedText);
+                },
+                (err) => {
+                    // Frame read fail (silent)
+                }
+            );
+        }
+
+        // Arranque inicial
+        window.addEventListener('DOMContentLoaded', () => {
+            loadPendingMatches();
+        });
+    </script>
+</body>
+</html>
