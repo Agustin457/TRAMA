@@ -27,7 +27,8 @@ class TestMatchingEngine(unittest.TestCase):
     def test_extract_brand(self):
         self.assertEqual(extract_brand("Lapicera Bic Cristal Azul"), "BIC")
         self.assertEqual(extract_brand("Estilografo Rotring Isograph"), "ROTRING")
-        self.assertEqual(extract_brand("Cuaderno de dibujo"), "CUADERNO") # Fallback to first word
+        self.assertEqual(extract_brand("Cuaderno de dibujo"), "VARIOS")  # Both are blacklisted, returns VARIOS
+        self.assertEqual(extract_brand("Acme de dibujo"), "ACME")  # Acme is not blacklisted, returns ACME
 
     def test_matching_flow(self):
         session: Session = self.SessionFactory()
@@ -63,7 +64,7 @@ class TestMatchingEngine(unittest.TestCase):
             
             # 2. Producto del proveedor con nombre muy similar sin EAN (debe generar coincidencia pendiente)
             pp_fuzzy = ProductoProveedor(
-                proveedor_id="ALE",
+                proveedor_id="POWERLAND",
                 sku_proveedor="ALE-FUZ-1",
                 nombre_original="Lapicera Bic Azul",
                 precio_crudo=80.0,
@@ -101,6 +102,43 @@ class TestMatchingEngine(unittest.TestCase):
             self.assertEqual(pp_fuzzy_db.master_sku, "ESC-BIC-CRI-AZU")
             self.assertEqual(pp_fuzzy_db.estado_unificacion, "APROBADO")
 
+        finally:
+            session.close()
+
+    def test_abbreviation_expansion_and_cleanup(self):
+        from src.matching import expand_abbreviations_in_name, clean_existing_abbreviations
+        # Test expand_abbreviations_in_name
+        self.assertEqual(expand_abbreviations_in_name("MARC. ROTRING NEGRO"), "MARCADOR ROTRING NEGRO")
+        self.assertEqual(expand_abbreviations_in_name("BOLIG. BIC AZUL"), "BOLIGRAFO BIC AZUL")
+        self.assertEqual(expand_abbreviations_in_name("LAP. ROJA"), "LAPICERA ROJA")
+        self.assertEqual(expand_abbreviations_in_name("MARC.CERA COLOR ALBORADA *12"), "MARCADOR CERA COLOR ALBORADA *12")
+        self.assertEqual(expand_abbreviations_in_name("BOLIG.0.5MM AZUL"), "BOLIGRAFO 0.5MM AZUL")
+        self.assertEqual(expand_abbreviations_in_name("ROLLER FILGO 1.0MM NEGRO"), "ROLLER FILGO 1.0MM NEGRO")
+        
+        session: Session = self.SessionFactory()
+        try:
+            # Insert abbreviated product in catalog
+            m_prod = CatalogoMaestro(
+                master_sku="ESC-ROTR-MAR-NEGR",
+                codigo_barras="11223344",
+                nombre_normalizado="MARC. ROTRING NEGRO",
+                marca="ROTRING",
+                categoria="ESCRITURA",
+                precio_costo=100.0,
+                margen_ganancia=0.40,
+                precio_venta=140.0
+            )
+            session.add(m_prod)
+            session.commit()
+            
+            # Run cleanup
+            updated_count = clean_existing_abbreviations(self.temp_db_path)
+            self.assertEqual(updated_count, 1)
+            
+            # Verify clean name in DB
+            session.expire_all()
+            p_db = session.query(CatalogoMaestro).filter(CatalogoMaestro.master_sku == "ESC-ROTR-MAR-NEGR").first()
+            self.assertEqual(p_db.nombre_normalizado, "MARCADOR ROTRING NEGRO")
         finally:
             session.close()
 

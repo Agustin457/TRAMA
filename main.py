@@ -7,11 +7,12 @@ import os
 from src.utils.logger import setup_logger
 from src.utils.helpers import load_config
 from src.models import init_db
-from src.migrate_woocommerce import migrate_woocommerce_csv
+# from src.migrate_woocommerce import migrate_woocommerce_csv
 from src.import_providers import import_supplier_data
-from src.matching import run_matching_engine
+from src.matching import run_matching_engine, clean_existing_abbreviations, fix_wrong_numeric_merges
 from src.transform import consolidate_master_catalog
 from src.load import load_to_csv, load_to_excel
+from src.preprocess import preprocess_all
 
 def main():
     # Establecer el directorio de trabajo al directorio de este script
@@ -43,21 +44,41 @@ def main():
         logger.info("Inicializando Base de Datos SQLite...")
         init_db(db_path)
         
-        # B. Ingesta de WooCommerce CSV
-        logger.info("Ejecutando migración inicial de WooCommerce CSV...")
-        migrate_woocommerce_csv(woocommerce_csv, db_path)
-
-        # C. Importar datos de cada proveedor
+        # B. Preprocesar y normalizar los Excel antes de importarlos
+        # Convierte cada lista a 4 columnas estandarizadas: sku | nombre | precio | codigo_barras
+        # Los archivos normalizados se guardan en data/processed/ y son usados
+        # automáticamente por el importador de proveedores
+        raw_data_dir = config.get("paths", {}).get("raw_data_dir", "data/raw")
+        processed_data_dir = config.get("paths", {}).get("processed_data_dir", "data/processed")
+        logger.info("Preprocesando y normalizando listas de precios...")
+        preprocess_all(raw_data_dir, processed_data_dir)
+        
+        # C. Importar datos de cada proveedor (usa archivos preprocesados si existen)
         logger.info("Ejecutando Ingesta de Proveedores...")
         providers = config.get("extraction", {}).get("providers", {})
         for prov_name in providers.keys():
             logger.info(f"Procesando proveedor: {prov_name.upper()}...")
             import_supplier_data(prov_name, db_path=db_path)
         
+        # C. Corregir unificaciones incorrectas por diferencias numéricas en nombres
+        # (ej: 'X 12 COLORES' y 'X 24 COLORES' unificados bajo el mismo SKU maestro)
+        logger.info("Corrigiendo unificaciones incorrectas por diferencias numéricas...")
+        fixed_count = fix_wrong_numeric_merges(db_path)
+        if fixed_count > 0:
+            logger.info(f"Se corrigieron {fixed_count} unificaciones incorrectas. Re-ejecutando motor de matching...")
+        
         # D. Ejecutar motor de matching y deduplicación semántica
         logger.info("Ejecutando Motor de Matching Inteligente...")
         matching_results = run_matching_engine(db_path)
         logger.info(f"Resultados de Matching: {matching_results}")
+
+        # D. Ingesta de WooCommerce CSV (OMITIDO - se usará en el proceso final)
+        # logger.info("Ejecutando migración de WooCommerce CSV...")
+        # migrate_woocommerce_csv(woocommerce_csv, db_path)
+
+        # E. Limpiar abreviaturas existentes en el catálogo maestro
+        logger.info("Ejecutando limpieza de abreviaturas en el catálogo maestro...")
+        clean_existing_abbreviations(db_path)
         
         # E. Consolidar catálogo maestro (Stock, Precios, Costos)
         logger.info("Consolidando Catálogo Maestro...")

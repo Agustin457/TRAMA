@@ -80,8 +80,8 @@ class TestTransformConsolidation(unittest.TestCase):
             # En el DataFrame de retorno, el stock unificado debe ser 15 + 25 = 40
             row = df[df["SKU_Maestro"] == "ESC-BIC-CRI-AZU"].iloc[0]
             self.assertEqual(row["Stock_Total_Consolidado"], 40)
-            self.assertEqual(row["Precio_Costo_Consolidado"], 120.0)
-            self.assertEqual(row["Precio_Venta_PVP"], 168.0)
+            self.assertEqual(row["Costo_con_IVA"], 120.0)
+            self.assertEqual(row["PVP_Sugerido"], 168.0)
 
         finally:
             session.close()

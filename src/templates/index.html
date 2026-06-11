@@ -565,11 +565,20 @@
         <!-- TAB 1: PENDING PRs BANNER -->
         <div id="unify-tab" class="view-content active">
             <div class="card">
-                <div class="card-header-bar">
-                    <div class="card-title">
-                        <i class="fa-solid fa-code-pull-request"></i> Propuestas de Unificación de Proveedores
+                <div class="card-header-bar" style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;">
+                        <div class="card-title">
+                            <i class="fa-solid fa-code-pull-request"></i> Propuestas de Unificación de Proveedores
+                            <span class="badge-count" id="unifyCardBadge" style="margin-left: 8px;">0</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label for="filterExcel" style="font-size: 0.85rem; color: var(--text-muted); white-space: nowrap;">Filtrar por Excel:</label>
+                            <select id="filterExcel" onchange="applyExcelFilter()" style="background: rgba(255,255,255,0.05); color: var(--white); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; cursor: pointer; outline: none;">
+                                <option value="">Todos los archivos</option>
+                            </select>
+                        </div>
                     </div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); width: 100%;">
                         Mezcla datos de proveedores al catálogo editando inline cada cambio.
                     </div>
                 </div>
@@ -665,7 +674,7 @@
                                     </div>
                                     <div>
                                         <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Margen</label>
-                                        <input type="number" step="0.01" class="form-control" id="scanFormMargen" required value="0.40">
+                                        <input type="number" step="0.01" class="form-control" id="scanFormMargen" required value="0.60">
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-success" style="width: 100%;">
@@ -748,172 +757,33 @@
             }
         }
 
+        let allMatches = [];
+        let limitPerPage = 50;
+        let currentLimit = 50;
+
         // Cargar sugerencias de unificación como "Pull Requests (PR)"
         async function loadPendingMatches() {
             const container = document.getElementById("unifyContainer");
             const badge = document.getElementById("unifyBadge");
+            const cardBadge = document.getElementById("unifyCardBadge");
             
             try {
                 const response = await fetch('/api/coincidencias');
-                const matches = await response.json();
+                allMatches = await response.json();
                 
-                badge.textContent = matches.length;
-                
-                if (matches.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i>
-                            <h3>¡Bandeja de PRs Vacía!</h3>
-                            <p>Todos los productos de los proveedores han sido deduplicados y unificados.</p>
-                        </div>
-                    `;
-                    return;
+                badge.textContent = allMatches.length;
+                if (cardBadge) {
+                    cardBadge.textContent = allMatches.length;
                 }
                 
-                let html = '';
-                matches.forEach(m => {
-                    const provLower = m.nombre_proveedor.toLowerCase();
-                    
-                    // Diferencias financieras
-                    const diffCost = m.costo_calculado_proveedor - m.costo_actual_catalogo;
-                    const diffPct = m.costo_actual_catalogo > 0 ? (diffCost / m.costo_actual_catalogo * 100).toFixed(1) : 0;
-                    
-                    let diffBadge = '';
-                    if (diffCost > 0) {
-                        diffBadge = `<span class="pr-change-badge up"><i class="fa-solid fa-arrow-trend-up"></i> +$${diffCost.toFixed(2)} (+${diffPct}%) Costo</span>`;
-                    } else if (diffCost < 0) {
-                        diffBadge = `<span class="pr-change-badge down"><i class="fa-solid fa-arrow-trend-down"></i> -$${Math.abs(diffCost).toFixed(2)} (${diffPct}%) Costo</span>`;
-                    } else {
-                        diffBadge = `<span class="pr-change-badge no-change">Sin cambios</span>`;
-                    }
-
-                    // Renderizar cada coincidencia como un Diff PR interactivo
-                    html += `
-                        <div class="pr-card" id="pr-card-${m.id}">
-                            <div class="pr-header">
-                                <div class="pr-info">
-                                    <span class="pr-badge">PR #${m.id}</span>
-                                    <span class="pr-title">Unificar proveedor <strong>${m.nombre_proveedor}</strong> a SKU Maestro <strong>${m.master_sku_sugerido}</strong></span>
-                                </div>
-                                <span class="pr-score"><i class="fa-solid fa-circle-half-stroke"></i> Similitud: ${m.similitud}%</span>
-                            </div>
-                            
-                            <!-- Git-like Interactive Diff View -->
-                            <div class="diff-view">
-                                <div class="diff-header-line">
-                                    <span>@@ Comparación de Atributos: Catálogo Maestro (-) vs Propuesta del Proveedor (+) @@</span>
-                                    <span>Editable</span>
-                                </div>
-                                
-                                <!-- NOMBRE DIFF -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">Nombre</span>
-                                    <span class="diff-value">${m.nombre_catalogo}</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">Nombre</span>
-                                    <div class="diff-value">
-                                        <input type="text" class="diff-input" id="input-nombre-${m.id}" value="${m.nombre_catalogo}">
-                                    </div>
-                                </div>
-
-                                <!-- MARCA DIFF -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">Marca</span>
-                                    <span class="diff-value">BIC (Detectado o Anterior)</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">Marca</span>
-                                    <div class="diff-value">
-                                        <input type="text" class="diff-input" id="input-marca-${m.id}" value="${m.nombre_catalogo.split(' ')[0]}">
-                                    </div>
-                                </div>
-
-                                <!-- BARCODE DIFF -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">Código Barras</span>
-                                    <span class="diff-value">SIN BARRAS</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">Código Barras</span>
-                                    <div class="diff-value">
-                                        <input type="text" class="diff-input" id="input-barras-${m.id}" value="${m.codigo_proveedor.length > 8 ? m.codigo_proveedor : ''}" placeholder="EAN13 Opcional">
-                                    </div>
-                                </div>
-                                
-                                <!-- COSTO DIFF -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">Costo</span>
-                                    <span class="diff-value">$${m.costo_actual_catalogo.toFixed(2)}</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">Costo</span>
-                                    <div class="diff-value">
-                                        <input type="number" step="0.01" class="diff-input" id="input-costo-${m.id}" value="${m.costo_calculado_proveedor.toFixed(2)}" oninput="recalculateDiffPvp(${m.id})">
-                                    </div>
-                                </div>
-
-                                <!-- MARGEN DIFF -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">Margen</span>
-                                    <span class="diff-value">40.0% (0.40)</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">Margen</span>
-                                    <div class="diff-value">
-                                        <input type="number" step="0.01" class="diff-input" id="input-margen-${m.id}" value="0.40" oninput="recalculateDiffPvp(${m.id})">
-                                    </div>
-                                </div>
-
-                                <!-- PVP ESTIMADO (CALCULADO DINÁMICAMENTE) -->
-                                <div class="diff-line deletion">
-                                    <span class="diff-indicator">-</span>
-                                    <span class="diff-field-name">PVP Actual</span>
-                                    <span class="diff-value">$${m.venta_actual_catalogo.toFixed(2)}</span>
-                                </div>
-                                <div class="diff-line addition">
-                                    <span class="diff-indicator">+</span>
-                                    <span class="diff-field-name">PVP Nuevo</span>
-                                    <div class="diff-value" style="font-weight:700; color:var(--accent-color); padding: 5px 0;">
-                                        <span id="pvp-val-${m.id}">$${(m.costo_calculado_proveedor * 1.40).toFixed(2)}</span> (Recalculado)
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Impact Summary Bar -->
-                            <div class="pr-summary-bar">
-                                <div>
-                                    Proveedor: <strong style="color:var(--white); text-transform:uppercase;">${m.nombre_proveedor}</strong> | Código original: <strong>${m.codigo_provider = m.codigo_proveedor}</strong>
-                                </div>
-                                ${diffBadge}
-                            </div>
-                            
-                            <!-- PR Actions Row -->
-                            <div class="pr-actions">
-                                <button class="btn btn-success" onclick="mergePullRequest(${m.id})">
-                                    <i class="fa-solid fa-code-merge"></i> Confirmar & Mezclar (Merge PR)
-                                </button>
-                                <button class="btn btn-outline" onclick="splitProductAsNew(${m.producto_proveedor_id}, ${m.id})">
-                                    <i class="fa-solid fa-code-branch"></i> Rama Nueva (Split New SKU)
-                                </button>
-                                <button class="btn btn-outline" style="border-color: rgba(248,81,73,0.3); color:#ff7b72;" onclick="rejectPullRequest(${m.id})">
-                                    <i class="fa-solid fa-circle-xmark"></i> Cerrar PR sin Mezclar
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
+                // Resetear límite al recargar
+                currentLimit = limitPerPage;
+                
+                // Rellenar selector de archivo excel de origen
+                populateExcelFilterDropdown();
+                
+                // Renderizar los PRs correspondientes al filtro seleccionado
+                renderFilteredMatches();
             } catch (err) {
                 console.error("Error al cargar la bandeja de PRs", err);
                 container.innerHTML = `
@@ -924,6 +794,222 @@
                     </div>
                 `;
             }
+        }
+
+        // Rellenar dinámicamente las opciones del selector de Excel
+        function populateExcelFilterDropdown() {
+            const select = document.getElementById("filterExcel");
+            if (!select) return;
+            
+            const currentVal = select.value;
+            
+            // Extraer nombres de archivo únicos
+            const files = [...new Set(allMatches.map(m => m.archivo_origen).filter(Boolean))].sort();
+            
+            select.innerHTML = '<option value="">Todos los archivos</option>';
+            files.forEach(f => {
+                const opt = document.createElement("option");
+                opt.value = f;
+                opt.textContent = f;
+                select.appendChild(opt);
+            });
+            
+            // Mantener la selección actual si todavía es válida
+            if (files.includes(currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        // Renderizar las coincidencias filtradas con paginación
+        function renderFilteredMatches() {
+            const container = document.getElementById("unifyContainer");
+            const select = document.getElementById("filterExcel");
+            const filterVal = select ? select.value : "";
+            
+            const filtered = filterVal 
+                ? allMatches.filter(m => m.archivo_origen === filterVal)
+                : allMatches;
+                
+            const cardBadge = document.getElementById("unifyCardBadge");
+            if (cardBadge) {
+                cardBadge.textContent = filterVal ? `${filtered.length} / ${allMatches.length}` : allMatches.length;
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-circle-check" style="color: var(--success-color);"></i>
+                        <h3>¡No hay PRs pendientes!</h3>
+                        <p>${filterVal ? `No hay propuestas de unificación asociadas al archivo <strong>${filterVal}</strong>.` : 'Todos los productos han sido unificados.'}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Limitar la cantidad de tarjetas renderizadas para evitar colapsar el DOM
+            const sliced = filtered.slice(0, currentLimit);
+            
+            let html = '';
+            sliced.forEach(m => {
+                // Diferencias financieras
+                const costCalc = m.costo_calculado_proveedor || 0;
+                const costAct = m.costo_actual_catalogo || 0;
+                const diffCost = costCalc - costAct;
+                const diffPct = costAct > 0 ? (diffCost / costAct * 100).toFixed(1) : 0;
+                
+                let diffBadge = '';
+
+                // Renderizar cada coincidencia como un Diff PR interactivo
+                html += `
+                    <div class="pr-card" id="pr-card-${m.id}">
+                        <div class="pr-header">
+                            <div class="pr-info">
+                                <span class="pr-badge">PR #${m.id}</span>
+                                <span class="pr-title">Unificar lista <strong>${m.archivo_origen}</strong> a SKU Maestro <strong>${m.master_sku_sugerido}</strong></span>
+                            </div>
+                            <span class="pr-score"><i class="fa-solid fa-circle-half-stroke"></i> Similitud: ${m.similitud}%</span>
+                        </div>
+                        
+                        <!-- Git-like Interactive Diff View -->
+                        <div class="diff-view">
+                            <div class="diff-header-line">
+                                <span>@@ Comparación de Atributos: Catálogo Maestro (-) vs Propuesta del Proveedor (+) @@</span>
+                                <span>Editable</span>
+                            </div>
+                            
+                            <!-- NOMBRE DIFF -->
+                            <div class="diff-line deletion">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">Nombre</span>
+                                <span class="diff-value">${m.nombre_catalogo}</span>
+                            </div>
+                            <div class="diff-line addition">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">Nombre</span>
+                                <div class="diff-value">
+                                    <input type="text" class="diff-input" id="input-nombre-${m.id}" value="${m.nombre_catalogo}">
+                                </div>
+                            </div>
+
+                            <!-- MARCA DIFF (OCULTO) -->
+                            <div class="diff-line deletion" style="display: none;">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">Marca</span>
+                                <span class="diff-value">${m.marca_catalogo}</span>
+                            </div>
+                            <div class="diff-line addition" style="display: none;">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">Marca</span>
+                                <div class="diff-value">
+                                    <input type="text" class="diff-input" id="input-marca-${m.id}" value="${(m.marca_catalogo && m.marca_catalogo !== 'VARIOS') ? m.marca_catalogo : m.marca_proveedor}">
+                                </div>
+                            </div>
+
+                            <!-- BARCODE DIFF -->
+                            <div class="diff-line deletion">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">Código Barras</span>
+                                <span class="diff-value">SIN BARRAS</span>
+                            </div>
+                            <div class="diff-line addition">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">Código Barras</span>
+                                <div class="diff-value">
+                                    <input type="text" class="diff-input" id="input-barras-${m.id}" value="${m.codigo_proveedor.length > 8 ? m.codigo_proveedor : ''}" placeholder="EAN13 Opcional">
+                                </div>
+                            </div>
+                            
+                            <!-- COSTO DIFF (OCULTO) -->
+                            <div class="diff-line deletion" style="display: none;">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">Costo</span>
+                                <span class="diff-value">$${(m.costo_actual_catalogo || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="diff-line addition" style="display: none;">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">Costo</span>
+                                <div class="diff-value">
+                                    <input type="number" step="0.01" class="diff-input" id="input-costo-${m.id}" value="${(m.costo_calculado_proveedor || 0).toFixed(2)}" oninput="recalculateDiffPvp(${m.id})">
+                                </div>
+                            </div>
+                            
+                            <!-- MARGEN DIFF (OCULTO) -->
+                            <div class="diff-line deletion" style="display: none;">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">Margen</span>
+                                <span class="diff-value">60.0% (0.60)</span>
+                            </div>
+                            <div class="diff-line addition" style="display: none;">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">Margen</span>
+                                <div class="diff-value">
+                                    <input type="number" step="0.01" class="diff-input" id="input-margen-${m.id}" value="0.60" oninput="recalculateDiffPvp(${m.id})">
+                                </div>
+                            </div>
+
+                            <!-- PVP ESTIMADO (OCULTO) -->
+                            <div class="diff-line deletion" style="display: none;">
+                                <span class="diff-indicator">-</span>
+                                <span class="diff-field-name">PVP Actual</span>
+                                <span class="diff-value">$${(m.venta_actual_catalogo || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="diff-line addition" style="display: none;">
+                                <span class="diff-indicator">+</span>
+                                <span class="diff-field-name">PVP Nuevo</span>
+                                <div class="diff-value" style="font-weight:700; color:var(--accent-color); padding: 5px 0;">
+                                    <span id="pvp-val-${m.id}">$${((m.costo_calculado_proveedor || 0) * 1.60).toFixed(2)}</span> (Recalculado)
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Impact Summary Bar -->
+                        <div class="pr-summary-bar">
+                            <div>
+                                Archivo de origen: <strong style="color:var(--white);">${m.archivo_origen}</strong> | Código original: <strong>${m.codigo_proveedor}</strong>
+                            </div>
+                            ${diffBadge}
+                        </div>
+                        
+                        <!-- PR Actions Row -->
+                        <div class="pr-actions">
+                            <button class="btn btn-success" onclick="mergePullRequest(${m.id})">
+                                <i class="fa-solid fa-code-merge"></i> Confirmar & Mezclar (Merge PR)
+                            </button>
+                            <button class="btn btn-outline" onclick="splitProductAsNew(${m.producto_proveedor_id}, ${m.id})">
+                                <i class="fa-solid fa-code-branch"></i> Rama Nueva (Split New SKU)
+                            </button>
+                            <button class="btn btn-outline" style="border-color: rgba(248,81,73,0.3); color:#ff7b72;" onclick="rejectPullRequest(${m.id})">
+                                <i class="fa-solid fa-circle-xmark"></i> Cerrar PR sin Mezclar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Botón para cargar más si supera el límite actual
+            if (filtered.length > currentLimit) {
+                html += `
+                    <div style="text-align: center; margin: 30px 0 10px 0;">
+                        <button class="btn btn-outline" style="width: auto; padding: 12px 30px; font-size: 1rem; border-color: var(--accent-color); color: var(--accent-color);" onclick="loadMoreMatches()">
+                            <i class="fa-solid fa-chevron-down"></i> Cargar más propuestas (+50)
+                        </button>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // Incrementar límite de renderizado
+        function loadMoreMatches() {
+            currentLimit += limitPerPage;
+            renderFilteredMatches();
+        }
+
+        // Ejecutar el filtrado cuando cambia el selector
+        function applyExcelFilter() {
+            currentLimit = limitPerPage; // Resetear paginación al cambiar de filtro
+            renderFilteredMatches();
         }
 
         // Ejecutar Mezcla (Merge PR) enviando los Overrides de los inputs editables
@@ -1056,7 +1142,7 @@
                     document.getElementById("scanFormBrand").value = "";
                     document.getElementById("scanFormCat").value = "VARIOS";
                     document.getElementById("scanFormCosto").value = "0.00";
-                    document.getElementById("scanFormMargen").value = "0.40";
+                    document.getElementById("scanFormMargen").value = "0.60";
                     
                     notFoundBox.style.display = "block";
                     showToast("El código no existe en el Catálogo Maestro", true);
@@ -1128,10 +1214,14 @@
             );
         }
 
-        // Arranque inicial
-        window.addEventListener('DOMContentLoaded', () => {
+        // Arranque inicial robusto
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', () => {
+                loadPendingMatches();
+            });
+        } else {
             loadPendingMatches();
-        });
+        }
     </script>
 </body>
 </html>

@@ -44,7 +44,8 @@ class TestMigration(unittest.TestCase):
             self.assertIsNotNone(prod)
             self.assertEqual(prod.nombre_normalizado, "LAPICERA BIC FINA AZUL")
             self.assertEqual(prod.codigo_barras, "1234567890123")
-            self.assertEqual(prod.precio_venta, 140.0)
+            self.assertEqual(prod.precio_venta, 0.0)
+            self.assertEqual(prod.precio_costo, 0.0)
             self.assertEqual(prod.marca, "BIC")
         finally:
             session.close()

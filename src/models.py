@@ -11,7 +11,7 @@ class Proveedor(Base):
     
     id = Column(String(50), primary_key=True)  # 'ALE', 'POWERLAND', 'ROTRING'
     nombre = Column(String(100), nullable=False)
-    margen_defecto = Column(Float, default=0.40)
+    margen_defecto = Column(Float, default=0.60)
     
     productos = relationship("ProductoProveedor", back_populates="proveedor")
 
@@ -27,7 +27,7 @@ class CatalogoMaestro(Base):
     marca = Column(String(100), nullable=False, index=True)
     categoria = Column(String(100), nullable=False, index=True)
     precio_costo = Column(Float, default=0.0, nullable=False)
-    margen_ganancia = Column(Float, default=0.40, nullable=False)
+    margen_ganancia = Column(Float, default=0.60, nullable=False)
     precio_venta = Column(Float, default=0.0, nullable=False)
     id_woocommerce = Column(Integer, nullable=True, index=True)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -50,6 +50,7 @@ class ProductoProveedor(Base):
     codigo_barras = Column(String(100), nullable=True, index=True)
     master_sku = Column(String(100), ForeignKey('catalogo_maestro.master_sku'), nullable=True, index=True)
     estado_unificacion = Column(String(50), default='PENDIENTE', nullable=False, index=True)  # 'PENDIENTE', 'APROBADO', 'NUEVO_PRODUCTO'
+    archivo_origen = Column(String(255), nullable=True)
     last_imported_at = Column(DateTime, default=datetime.utcnow)
 
     proveedor = relationship("Proveedor", back_populates="productos")
@@ -140,9 +141,9 @@ def init_db(db_path: str = None) -> None:
     session = SessionClass()
     try:
         default_providers = [
-            Proveedor(id='ALE', nombre='Librería ALE', margen_defecto=0.40),
-            Proveedor(id='POWERLAND', nombre='Powerland SRL', margen_defecto=0.40),
-            Proveedor(id='ROTRING', nombre='Rotring / Plantec', margen_defecto=0.40)
+            Proveedor(id='ALE', nombre='Librería ALE', margen_defecto=0.60),
+            Proveedor(id='POWERLAND', nombre='Powerland SRL', margen_defecto=0.60),
+            Proveedor(id='ROTRING', nombre='Rotring / Plantec', margen_defecto=0.60)
         ]
         for prov in default_providers:
             existing = session.query(Proveedor).filter(Proveedor.id == prov.id).first()

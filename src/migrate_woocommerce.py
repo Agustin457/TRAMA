@@ -4,20 +4,17 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from src.utils.logger import setup_logger
 from src.utils.helpers import load_config
-from src.models import init_db, get_db_session, CatalogoMaestro
+from src.models import init_db, get_db_session, CatalogoMaestro, ProductoProveedor
+from src.matching import extract_brand, clean_and_normalize_name
 
 logger = setup_logger()
 
-def extract_brand_from_name(name: str) -> str:
+def extract_brand_from_name(name: str, session: Session = None) -> str:
     """
-    Intenta extraer la marca a partir del nombre del producto usando palabras clave comunes.
+    Intenta extraer la marca a partir del nombre del producto.
+    Llama a la lógica unificada y dinámica de extract_brand.
     """
-    name_upper = name.upper()
-    brands = ["BIC", "ROTRING", "DELI", "KANGARO", "FILGO", "PLANTEC", "POWERLAND", "PIZZINI", "FABER-CASTELL", "FABER", "SIMBALL", "EBR"]
-    for brand in brands:
-        if re.search(r'\b' + re.escape(brand) + r'\b', name_upper):
-            return brand
-    return "VARIOS"
+    return extract_brand(name, session)
 
 def generate_mock_woocommerce_csv(target_path: str) -> None:
     """
@@ -139,28 +136,66 @@ def migrate_woocommerce_csv(csv_path: str, db_path: str = None) -> int:
             if barcode == "":
                 barcode = None
                 
-            precio_venta = clean_float(row.get(price_col)) if price_col else 0.0
-            margen = 0.40  # Margen por defecto
-            costo = round(precio_venta / (1 + margen), 2)
+            # El precio de venta de WooCommerce no se tiene en cuenta para evitar discrepancias
+            precio_venta = 0.0
+            margen = 0.60  # Margen por defecto
+            costo = 0.0
             
-            # Detectar marca y categoria
-            marca = extract_brand_from_name(nombre)
+            # Detectar marca y categoria usando la sesión de base de datos
+            marca = extract_brand_from_name(nombre, session)
             # Definir categoria por defecto o extraer de columna si existiera
             categoria = "VARIOS"
             
-            # Buscar en catalogo_maestro
-            db_product = session.query(CatalogoMaestro).filter(CatalogoMaestro.master_sku == sku).first()
+            # Buscar en catalogo_maestro con estrategia en cascada
+            db_product = None
             
+            # 1. Por código de barras
+            if barcode:
+                db_product = session.query(CatalogoMaestro).filter(CatalogoMaestro.codigo_barras == barcode).first()
+                if db_product:
+                    logger.info(f"Fósil: WooCommerce ID {id_wc} mapeado a {db_product.master_sku} por EAN: {barcode}")
+                    
+            # 2. Por SKU del Proveedor
+            if not db_product:
+                # Comprobar si el SKU de WooCommerce o su sufijo coincide con ProductoProveedor.sku_proveedor
+                p_prov = session.query(ProductoProveedor).filter(ProductoProveedor.sku_proveedor == sku).first()
+                if not p_prov and "-" in sku:
+                    parts = sku.split("-", 1)
+                    suffix = parts[1]
+                    p_prov = session.query(ProductoProveedor).filter(ProductoProveedor.sku_proveedor == suffix).first()
+                    
+                if p_prov and p_prov.master_sku:
+                    db_product = session.query(CatalogoMaestro).filter(CatalogoMaestro.master_sku == p_prov.master_sku).first()
+                    if db_product:
+                        logger.info(f"Fósil: WooCommerce ID {id_wc} (SKU {sku}) mapeado a {db_product.master_sku} mediante SKU Proveedor {p_prov.sku_proveedor}")
+                        
+            # 3. Por nombre exacto normalizado
+            if not db_product:
+                norm_wc_name = clean_and_normalize_name(nombre)
+                # Buscamos en CatalogoMaestro por nombre_normalizado
+                db_product = session.query(CatalogoMaestro).filter(CatalogoMaestro.nombre_normalizado == nombre).first()
+                if db_product:
+                    logger.info(f"Fósil: WooCommerce ID {id_wc} mapeado a {db_product.master_sku} por nombre exacto")
+                    
+            # 4. Por SKU directo (WooCommerce SKU == Master SKU)
+            if not db_product:
+                db_product = session.query(CatalogoMaestro).filter(CatalogoMaestro.master_sku == sku).first()
+                if db_product:
+                    logger.info(f"Fósil: WooCommerce ID {id_wc} mapeado a {db_product.master_sku} por SKU idéntico")
+                    
             if db_product:
-                db_product.nombre_normalizado = nombre
-                if barcode:
+                db_product.id_woocommerce = id_wc
+                if barcode and not db_product.codigo_barras:
                     db_product.codigo_barras = barcode
-                if id_wc:
-                    db_product.id_woocommerce = id_wc
-                db_product.precio_venta = precio_venta
-                db_product.marca = marca
+                # No sobrescribir marca a menos que sea VARIOS
+                if marca != "VARIOS" and db_product.marca == "VARIOS":
+                    db_product.marca = marca
+                
+                # Inicializar solo si son nulos para no pisar valores de proveedores ya calculados
+                if db_product.precio_venta == 0.0 or db_product.precio_venta is None:
+                    db_product.precio_venta = 0.0
                 if db_product.precio_costo == 0.0 or db_product.precio_costo is None:
-                    db_product.precio_costo = costo
+                    db_product.precio_costo = 0.0
                 updated_count += 1
             else:
                 new_product = CatalogoMaestro(
@@ -169,9 +204,9 @@ def migrate_woocommerce_csv(csv_path: str, db_path: str = None) -> int:
                     nombre_normalizado=nombre,
                     marca=marca,
                     categoria=categoria,
-                    precio_costo=costo,
+                    precio_costo=0.0,
                     margen_ganancia=margen,
-                    precio_venta=precio_venta,
+                    precio_venta=0.0,
                     id_woocommerce=id_wc
                 )
                 session.add(new_product)

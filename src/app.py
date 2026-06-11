@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from src.utils.helpers import load_config
 from src.models import get_db_session, CatalogoMaestro, CoincidenciaPendiente, ProductoProveedor
-from src.matching import approve_pending_match, reject_pending_match, split_and_create_new
+from src.matching import approve_pending_match, reject_pending_match, split_and_create_new, extract_brand
 
 app = FastAPI(
     title="Depósito Scanner & Matching App",
@@ -22,7 +22,7 @@ class ProductoCreate(BaseModel):
     categoria: str = Field("VARIOS", description="Categoría del artículo")
     codigo_barras: Optional[str] = Field(None, description="Código de barras EAN")
     precio_costo: float = Field(0.0, ge=0.0, description="Precio de costo")
-    margen_ganancia: float = Field(0.40, ge=0.0, description="Margen de ganancia (ej. 0.40)")
+    margen_ganancia: float = Field(0.60, ge=0.0, description="Margen de ganancia (ej. 0.60)")
 
 class ResolverMatch(BaseModel):
     action: str = Field(..., pattern="^(APROBAR|RECHAZAR)$", description="Acción: APROBAR o RECHAZAR")
@@ -171,11 +171,14 @@ def get_pending_matches():
                     "nombre_catalogo": m_prod.nombre_normalizado,
                     "nombre_proveedor_producto": p_prov.nombre_original,
                     "similitud": round(m.similitud, 1),
-                    "precio_crudo_proveedor": p_prov.precio_crudo,
-                    "costo_calculado_proveedor": p_prov.costo_calculado,
-                    "costo_actual_catalogo": m_prod.precio_costo,
-                    "venta_actual_catalogo": m_prod.precio_venta,
-                    "producto_proveedor_id": p_prov.id
+                    "precio_crudo_proveedor": p_prov.precio_crudo or 0.0,
+                    "costo_calculado_proveedor": p_prov.costo_calculado or 0.0,
+                    "costo_actual_catalogo": m_prod.precio_costo or 0.0,
+                    "venta_actual_catalogo": m_prod.precio_venta or 0.0,
+                    "producto_proveedor_id": p_prov.id,
+                    "archivo_origen": p_prov.archivo_origen or "Desconocido",
+                    "marca_catalogo": m_prod.marca or "VARIOS",
+                    "marca_proveedor": extract_brand(p_prov.nombre_original, session)
                 })
         return results
     finally:

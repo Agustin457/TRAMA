@@ -20,25 +20,23 @@ extraction:
   timeout: 30
   providers:
     ale:
-      filename: "Lista de Precios ALE Actualizada (49).xlsx"
+      filename: "Lista Ale.xlsx"
       sheet: "LISTA DE PRECIOS"
       header_row: 2
+      processed_filename: "Lista Ale_normalizado.xlsx"
+      has_iva: true
     powerland:
-      filename: "ListadePrecios (53).xlsx"
+      filename: "Lista Powerland.xlsx"
       sheet: "Lista de precios de productos"
       header_row: 5
+      processed_filename: "Lista Powerland_normalizado.xlsx"
+      has_iva: true
     rotring:
-      filename: "LISTA Nº 1 - 26 LINEA ROTRING.xlsx"
+      filename: "Lista Plantec*.xlsx"
       sheet: "Hoja1"
       header_row: 17
-
-
-# Configuración de impuestos de Argentina (Cascada Impositiva)
-taxes:
-  iva: 0.21         # Alícuota general de IVA (21%)
-  iibb: 0.035       # Percepción de Ingresos Brutos (3.5%)
-  cheque: 0.012     # Impuesto a los débitos y créditos bancarios (1.2%)
-  sellos: 0.01      # Impuesto a los sellos / Percepción adicional (1.0%)
+      processed_filename: "Lista Plantec*_normalizado.xlsx"
+      has_iva: false
 
 
 
