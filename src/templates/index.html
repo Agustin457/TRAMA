@@ -634,8 +634,41 @@
                                     <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-color);" id="scanResVenta">$0.00</div>
                                 </div>
                             </div>
-                            <div style="font-size: 0.85rem; color: var(--text-muted);">
-                                Marca: <strong id="scanResBrand" style="color: var(--text-color);">--</strong> | Categoría: <strong id="scanResCat" style="color: var(--text-color);">--</strong>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                                Marca: <strong id="scanResBrand" style="color: var(--text-color);">--</strong> | Categoría: <strong id="scanResCat" style="color: var(--text-color);">--</strong> | Stock: <strong id="scanResStock" style="color: var(--white);">0</strong>
+                            </div>
+                            
+                            <!-- Registrar Ingreso de Mercadería Form -->
+                            <div style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; color: var(--white); display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-cart-flatbed-suitcases"></i> Registrar Ingreso de Mercadería
+                                </h4>
+                                <form id="stockIntakeForm" onsubmit="submitStockIntake(event)">
+                                    <input type="hidden" id="intakeBarcode">
+                                    <input type="hidden" id="intakeSku">
+                                    <div style="margin-bottom: 10px;">
+                                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Proveedor de la Compra</label>
+                                        <select class="form-control" id="intakeProvider" required>
+                                            <option value="LOCAL">Stock Local / Depósito Propio</option>
+                                            <option value="ALE">Librería ALE</option>
+                                            <option value="POWERLAND">Powerland SRL</option>
+                                            <option value="ROTRING">Rotring / Plantec</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin-bottom: 12px;">
+                                        <div>
+                                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Cantidad a Sumar</label>
+                                            <input type="number" class="form-control" id="intakeQty" required min="1" value="1">
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Costo Unitario ($)</label>
+                                            <input type="number" step="0.01" class="form-control" id="intakeCost" required placeholder="Costo original">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-outline" style="width: 100%; border-color: var(--accent-color); color: var(--accent-color);">
+                                        <i class="fa-solid fa-plus"></i> Registrar Ingreso
+                                    </button>
+                                </form>
                             </div>
                         </div>
 
@@ -667,14 +700,29 @@
                                         <input type="text" class="form-control" id="scanFormCat" required placeholder="Ej. ESCRITURA">
                                     </div>
                                 </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                                     <div>
-                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Costo ($)</label>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Costo Unitario ($)</label>
                                         <input type="number" step="0.01" class="form-control" id="scanFormCosto" required value="0.00">
                                     </div>
                                     <div>
                                         <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Margen</label>
                                         <input type="number" step="0.01" class="form-control" id="scanFormMargen" required value="0.60">
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin-bottom: 15px;">
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Cant. Inicial</label>
+                                        <input type="number" class="form-control" id="scanFormInitialQty" required value="1" min="0">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Proveedor Inicial</label>
+                                        <select class="form-control" id="scanFormInitialProvider" required>
+                                            <option value="LOCAL">Stock Local</option>
+                                            <option value="ALE">Librería ALE</option>
+                                            <option value="POWERLAND">Powerland SRL</option>
+                                            <option value="ROTRING">Rotring / Plantec</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-success" style="width: 100%;">
@@ -1130,6 +1178,13 @@
                     document.getElementById("scanResVenta").textContent = `$${prod.precio_venta.toFixed(2)}`;
                     document.getElementById("scanResBrand").textContent = prod.marca;
                     document.getElementById("scanResCat").textContent = prod.categoria;
+                    document.getElementById("scanResStock").textContent = prod.stock_total;
+                    
+                    // Pre-fill stock receipt form
+                    document.getElementById("intakeBarcode").value = prod.codigo_barras || "";
+                    document.getElementById("intakeSku").value = prod.master_sku;
+                    document.getElementById("intakeCost").value = prod.precio_costo.toFixed(2);
+                    document.getElementById("intakeQty").value = "1";
                     
                     foundBox.style.display = "block";
                     showToast("Producto encontrado en el Catálogo Maestro");
@@ -1152,6 +1207,42 @@
             }
         }
 
+        // Enviar formulario de ingreso de mercadería
+        async function submitStockIntake(event) {
+            event.preventDefault();
+            const barcode = document.getElementById("intakeBarcode").value;
+            const sku = document.getElementById("intakeSku").value;
+            const provider = document.getElementById("intakeProvider").value;
+            const qty = parseInt(document.getElementById("intakeQty").value);
+            const cost = parseFloat(document.getElementById("intakeCost").value);
+
+            try {
+                const response = await fetch('/api/producto/ingreso', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        codigo_barras: barcode,
+                        master_sku: sku,
+                        proveedor_id: provider,
+                        cantidad: qty,
+                        precio_costo: cost
+                    })
+                });
+                
+                if (response.ok) {
+                    const res = await response.json();
+                    showToast(`¡Ingreso registrado! Stock total: ${res.stock_total}`);
+                    // Refrescar los datos en pantalla
+                    queryBarcode(barcode || sku);
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || "Error al registrar ingreso de stock", true);
+                }
+            } catch (err) {
+                showToast("Error de conexión al registrar ingreso de stock", true);
+            }
+        }
+
         // Guardar producto desde el formulario del escáner
         async function saveScannedProduct(event) {
             event.preventDefault();
@@ -1162,8 +1253,11 @@
             const barcode = document.getElementById("scanFormBarcode").value;
             const cost = parseFloat(document.getElementById("scanFormCosto").value);
             const margin = parseFloat(document.getElementById("scanFormMargen").value);
+            const initialQty = parseInt(document.getElementById("scanFormInitialQty").value);
+            const initialProv = document.getElementById("scanFormInitialProvider").value;
 
             try {
+                // 1. Crear el producto maestro
                 const response = await fetch('/api/producto', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1180,7 +1274,32 @@
                 
                 if (response.ok) {
                     showToast("¡Producto registrado en el Catálogo Maestro!");
-                    queryBarcode(barcode);
+                    
+                    // 2. Si la cantidad inicial es mayor a 0, registrar el ingreso de stock
+                    if (initialQty > 0) {
+                        try {
+                            const intakeResponse = await fetch('/api/producto/ingreso', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    codigo_barras: barcode,
+                                    master_sku: sku,
+                                    proveedor_id: initialProv,
+                                    cantidad: initialQty,
+                                    precio_costo: cost
+                                })
+                            });
+                            if (intakeResponse.ok) {
+                                showToast(`¡Stock inicial de ${initialQty} unidades registrado exitosamente!`);
+                            } else {
+                                showToast("Producto creado, pero falló al registrar el stock inicial", true);
+                            }
+                        } catch (err) {
+                            showToast("Error al registrar stock inicial", true);
+                        }
+                    }
+                    
+                    queryBarcode(barcode || sku);
                 } else {
                     const err = await response.json();
                     showToast(err.detail || "Error al guardar producto", true);

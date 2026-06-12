@@ -146,7 +146,8 @@ def init_db(db_path: str = None) -> None:
         default_providers = [
             Proveedor(id='ALE', nombre='Librería ALE', margen_defecto=0.60),
             Proveedor(id='POWERLAND', nombre='Powerland SRL', margen_defecto=0.60),
-            Proveedor(id='ROTRING', nombre='Rotring / Plantec', margen_defecto=0.60)
+            Proveedor(id='ROTRING', nombre='Rotring / Plantec', margen_defecto=0.60),
+            Proveedor(id='LOCAL', nombre='Stock Local / Depósito Propio', margen_defecto=0.60)
         ]
         for prov in default_providers:
             existing = session.query(Proveedor).filter(Proveedor.id == prov.id).first()

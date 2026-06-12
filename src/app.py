@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from src.utils.helpers import load_config
-from src.models import get_db_session, CatalogoMaestro, CoincidenciaPendiente, ProductoProveedor
+from src.models import get_db_session, CatalogoMaestro, CoincidenciaPendiente, ProductoProveedor, Proveedor
 from src.matching import approve_pending_match, reject_pending_match, split_and_create_new, extract_brand
 
 app = FastAPI(
@@ -32,6 +32,13 @@ class ResolverMatch(BaseModel):
     precio_costo: Optional[float] = None
     margen_ganancia: Optional[float] = None
     codigo_barras: Optional[str] = None
+
+class IngresoMercaderia(BaseModel):
+    codigo_barras: Optional[str] = None
+    master_sku: Optional[str] = None
+    proveedor_id: str = Field(..., description="ID del proveedor que provee la mercadería")
+    cantidad: int = Field(..., ge=1, description="Cantidad de unidades compradas/ingresadas")
+    precio_costo: Optional[float] = Field(None, ge=0.0, description="Nuevo costo unitario (opcional)")
 
 def get_db_path_local() -> str:
     try:
@@ -69,6 +76,13 @@ def get_product_by_barcode(barcode: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Producto con código de barras '{barcode}' no encontrado en el catálogo maestro."
             )
+            
+        from sqlalchemy import func
+        total_stock = session.query(func.sum(ProductoProveedor.stock_crudo)).filter(
+            ProductoProveedor.master_sku == product.master_sku,
+            ProductoProveedor.estado_unificacion == 'APROBADO'
+        ).scalar() or 0
+        
         return {
             "master_sku": product.master_sku,
             "codigo_barras": product.codigo_barras,
@@ -78,7 +92,8 @@ def get_product_by_barcode(barcode: str):
             "precio_costo": product.precio_costo,
             "margen_ganancia": product.margen_ganancia,
             "precio_venta": product.precio_venta,
-            "id_woocommerce": product.id_woocommerce
+            "id_woocommerce": product.id_woocommerce,
+            "stock_total": int(total_stock)
         }
     finally:
         session.close()
@@ -240,4 +255,122 @@ def split_create_new_endpoint(prod_prov_id: int):
         session.close()
 
     return {"status": "success", "new_sku": new_sku, "message": f"Producto registrado como nuevo con SKU: {new_sku}"}
+
+@app.post("/api/producto/ingreso")
+def register_stock_intake(intake: IngresoMercaderia):
+    db_path = get_db_path_local()
+    SessionFactory = get_db_session(db_path)
+    session: Session = SessionFactory()
+    
+    try:
+        # 1. Resolver producto maestro
+        m_prod = None
+        if intake.codigo_barras:
+            m_prod = session.query(CatalogoMaestro).filter(CatalogoMaestro.codigo_barras == intake.codigo_barras.strip()).first()
+        elif intake.master_sku:
+            m_prod = session.query(CatalogoMaestro).filter(CatalogoMaestro.master_sku == intake.master_sku.strip().upper()).first()
+            
+        if not m_prod:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Producto no encontrado en el catálogo maestro."
+            )
+            
+        # 2. Verificar existencia del proveedor
+        prov = session.query(Proveedor).filter(Proveedor.id == intake.proveedor_id).first()
+        if not prov:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Proveedor '{intake.proveedor_id}' no válido."
+            )
+            
+        # 3. Calcular costo con IVA si corresponde
+        costo_unitario = None
+        if intake.precio_costo is not None:
+            # Determinar si el proveedor tiene IVA incluido o no
+            has_iva = True
+            if intake.proveedor_id == 'ROTRING':
+                has_iva = False
+            
+            from src.import_providers import calculate_cost_with_iva
+            costo_unitario = calculate_cost_with_iva(intake.precio_costo, has_iva)
+            
+        # 4. Buscar o crear ProductoProveedor
+        p_prov = session.query(ProductoProveedor).filter(
+            ProductoProveedor.master_sku == m_prod.master_sku,
+            ProductoProveedor.proveedor_id == intake.proveedor_id
+        ).first()
+        
+        if p_prov:
+            # Sumar al stock existente
+            p_prov.stock_crudo += intake.cantidad
+            if costo_unitario is not None:
+                # Si el costo cambió, registrar en historial
+                if abs(p_prov.costo_calculado - costo_unitario) > 0.01:
+                    from src.models import HistorialPrecio
+                    hist = HistorialPrecio(
+                        producto_proveedor_id=p_prov.id,
+                        precio_crudo_anterior=p_prov.precio_crudo,
+                        precio_crudo_nuevo=intake.precio_costo,
+                        costo_calculado_anterior=p_prov.costo_calculado,
+                        costo_calculado_nuevo=costo_unitario
+                    )
+                    session.add(hist)
+                p_prov.precio_crudo = intake.precio_costo
+                p_prov.costo_calculado = costo_unitario
+        else:
+            # Crear un ProductoProveedor nuevo vinculado
+            sku_prov = f"{m_prod.master_sku}-{intake.proveedor_id}"
+            costo_crudo = intake.precio_costo if intake.precio_costo is not None else m_prod.precio_costo
+            costo_calc = costo_unitario if costo_unitario is not None else m_prod.precio_costo
+            
+            p_prov = ProductoProveedor(
+                proveedor_id=intake.proveedor_id,
+                sku_proveedor=sku_prov,
+                nombre_original=m_prod.nombre_normalizado,
+                precio_crudo=costo_crudo,
+                costo_calculado=costo_calc,
+                stock_crudo=intake.cantidad,
+                codigo_barras=m_prod.codigo_barras,
+                master_sku=m_prod.master_sku,
+                estado_unificacion='APROBADO',
+                archivo_origen='INGRESO_MANUAL'
+            )
+            session.add(p_prov)
+            
+        session.commit()
+        
+        # 5. Ejecutar consolidación para propagar al Catálogo Maestro
+        from src.transform import consolidate_master_catalog
+        consolidate_master_catalog(db_path)
+        
+        # Recargar producto maestro fresco
+        session.refresh(m_prod)
+        
+        # Obtener el stock total consolidado
+        from sqlalchemy import func
+        total_stock = session.query(func.sum(ProductoProveedor.stock_crudo)).filter(
+            ProductoProveedor.master_sku == m_prod.master_sku,
+            ProductoProveedor.estado_unificacion == 'APROBADO'
+        ).scalar() or 0
+        
+        return {
+            "status": "success",
+            "master_sku": m_prod.master_sku,
+            "nombre_normalizado": m_prod.nombre_normalizado,
+            "precio_costo": m_prod.precio_costo,
+            "precio_venta": m_prod.precio_venta,
+            "stock_total": total_stock
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al registrar el ingreso de mercadería: {e}"
+        )
+    finally:
+        session.close()
 
