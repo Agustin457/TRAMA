@@ -12,6 +12,7 @@ paths:
   master_output_name: "productos_master"
   db_path: "postgresql://postgres.jqpvrdvvmvovibrtrvjt:5koWH6zpYdpvekrC@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
   woocommerce_csv_path: "data/raw/woocommerce_products.csv"
+  images_dir: "data/images"
 
 # Configuración de API WooCommerce
 woocommerce:
@@ -19,6 +20,12 @@ woocommerce:
   consumer_key: "ck_reemplazar_con_tu_key"
   consumer_secret: "cs_reemplazar_con_tu_secret"
   dry_run: true  # Simular los cambios en la consola sin guardarlos en la web
+
+# Configuración de API WordPress (Para biblioteca de medios)
+wordpress:
+  username: "tu_usuario_administrador"
+  application_password: "xxxx xxxx xxxx xxxx"  # Generada en WordPress -> Perfil -> Contraseñas de aplicación
+
 
 
 
