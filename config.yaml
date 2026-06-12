@@ -10,7 +10,7 @@ paths:
   processed_data_dir: "data/processed"
   output_dir: "data/output"
   master_output_name: "productos_master"
-  db_path: "data/etl_database.db"
+  db_path: "postgresql://postgres.jqpvrdvvmvovibrtrvjt:[YOUR-PASSWORD]@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
   woocommerce_csv_path: "data/raw/woocommerce_products.csv"
 
 
