@@ -13,6 +13,14 @@ paths:
   db_path: "postgresql://postgres.jqpvrdvvmvovibrtrvjt:5koWH6zpYdpvekrC@aws-1-us-west-2.pooler.supabase.com:5432/postgres"
   woocommerce_csv_path: "data/raw/woocommerce_products.csv"
 
+# Configuración de API WooCommerce
+woocommerce:
+  url: "https://tramabuenosaires.com.ar"
+  consumer_key: "ck_reemplazar_con_tu_key"
+  consumer_secret: "cs_reemplazar_con_tu_secret"
+  dry_run: true  # Simular los cambios en la consola sin guardarlos en la web
+
+
 
 # Configuración de extracción
 extraction:
