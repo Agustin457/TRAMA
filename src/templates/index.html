@@ -595,25 +595,33 @@
         <!-- TAB 2: CAMERA ESCANNER & SEARCH -->
         <div id="scanner-tab" class="view-content">
             <div class="scanner-layout">
-                <div class="card">
+                <div class="card" id="cameraScannerCard">
                     <div class="card-header-bar">
                         <div class="card-title">
-                            <i class="fa-solid fa-camera"></i> Escáner de Barras EAN
+                            <i class="fa-solid fa-camera"></i> Escáner de Cámara
                         </div>
+                        <button class="btn btn-outline" style="width: auto; font-size: 0.8rem; padding: 4px 8px; border-color: var(--accent-color); color: var(--accent-color);" onclick="toggleDesktopScannerMode(true)">
+                            <i class="fa-solid fa-keyboard"></i> Usar Pistola USB
+                        </button>
                     </div>
                     <div id="reader"></div>
                 </div>
                 
                 <div class="scanner-info-panel">
-                    <!-- Manual Lookup -->
+                    <!-- Manual Lookup / USB Scanner -->
                     <div class="card">
-                        <div class="card-title">
-                            <i class="fa-solid fa-magnifying-glass"></i> Búsqueda Directa
+                        <div class="card-header-bar">
+                            <div class="card-title">
+                                <i class="fa-solid fa-magnifying-glass"></i> Lector de Códigos (Pistola USB / Manual)
+                            </div>
+                            <button id="btnToggleCamera" class="btn btn-outline" style="width: auto; font-size: 0.8rem; padding: 4px 8px; display: none;" onclick="toggleDesktopScannerMode(false)">
+                                <i class="fa-solid fa-camera"></i> Activar Cámara móvil
+                            </button>
                         </div>
-                        <div class="manual-search-box">
-                            <input type="text" class="form-control" id="searchBarcodeVal" placeholder="Ingresa código o SKU...">
-                            <button class="btn btn-outline" style="width: auto;" onclick="runManualSearch()">Buscar</button>
-                        </div>
+                        <form id="barcodeSearchForm" onsubmit="event.preventDefault(); runManualSearch();" class="manual-search-box">
+                            <input type="text" class="form-control" id="searchBarcodeVal" placeholder="Escanea código o ingresa SKU..." autocomplete="off">
+                            <button type="submit" class="btn btn-outline" style="width: auto;">Buscar</button>
+                        </form>
                     </div>
 
                     <!-- Scan Results panel -->
@@ -748,6 +756,36 @@
     <script>
         let html5QrcodeScanner;
 
+        let desktopScannerMode = false;
+
+        function toggleDesktopScannerMode(isDesktop) {
+            desktopScannerMode = isDesktop;
+            const cameraCard = document.getElementById("cameraScannerCard");
+            const btnToggleCamera = document.getElementById("btnToggleCamera");
+            const barcodeInput = document.getElementById("searchBarcodeVal");
+
+            if (isDesktop) {
+                // Modo Pistola USB activo: ocultar cámara y detener escáner
+                if (cameraCard) cameraCard.style.display = "none";
+                if (btnToggleCamera) btnToggleCamera.style.display = "inline-block";
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.clear().catch(err => console.error("Error clearing scanner", err));
+                }
+                showToast("Modo Pistola USB activado. Foco automático encendido.");
+                
+                // Forzar foco en input de búsqueda
+                setTimeout(() => {
+                    barcodeInput.focus();
+                }, 100);
+            } else {
+                // Modo Cámara activo: mostrar cámara y encender
+                if (cameraCard) cameraCard.style.display = "block";
+                if (btnToggleCamera) btnToggleCamera.style.display = "none";
+                initScanner();
+                showToast("Escáner de Cámara activado.");
+            }
+        }
+
         // Cambiar entre pestañas
         function switchTab(tabId) {
             document.querySelectorAll('.view-content').forEach(view => {
@@ -758,10 +796,19 @@
             });
 
             document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
 
             if (tabId === 'scanner-tab') {
-                initScanner();
+                if (!desktopScannerMode) {
+                    initScanner();
+                } else {
+                    setTimeout(() => {
+                        const input = document.getElementById("searchBarcodeVal");
+                        if (input) input.focus();
+                    }, 100);
+                }
             } else {
                 if (html5QrcodeScanner) {
                     html5QrcodeScanner.clear().catch(err => console.error("Error clearing scanner", err));
@@ -1158,7 +1205,7 @@
         }
 
         // Consultar producto por código de barras o SKU
-        async function queryBarcode(barcode) {
+        async function queryBarcode(barcode, refocusQty = true) {
             const resultCard = document.getElementById("scannerResultCard");
             const foundBox = document.getElementById("prodFoundBox");
             const notFoundBox = document.getElementById("prodNotFoundBox");
@@ -1188,6 +1235,17 @@
                     
                     foundBox.style.display = "block";
                     showToast("Producto encontrado en el Catálogo Maestro");
+                    
+                    // Foco automático en la cantidad si estamos en modo escritorio/pistola
+                    if (desktopScannerMode && refocusQty) {
+                        setTimeout(() => {
+                            const qtyInput = document.getElementById("intakeQty");
+                            if (qtyInput) {
+                                qtyInput.focus();
+                                qtyInput.select();
+                            }
+                        }, 100);
+                    }
                 } else {
                     document.getElementById("scannedNotFoundCode").textContent = barcode;
                     document.getElementById("scanFormBarcode").value = barcode;
@@ -1198,9 +1256,21 @@
                     document.getElementById("scanFormCat").value = "VARIOS";
                     document.getElementById("scanFormCosto").value = "0.00";
                     document.getElementById("scanFormMargen").value = "0.60";
+                    document.getElementById("scanFormInitialQty").value = "1";
                     
                     notFoundBox.style.display = "block";
                     showToast("El código no existe en el Catálogo Maestro", true);
+                    
+                    // Foco automático en el SKU si estamos en modo escritorio/pistola
+                    if (desktopScannerMode) {
+                        setTimeout(() => {
+                            const skuInput = document.getElementById("scanFormSku");
+                            if (skuInput) {
+                                skuInput.focus();
+                                skuInput.select();
+                            }
+                        }, 100);
+                    }
                 }
             } catch (err) {
                 showToast("Error al conectar con la API de consulta", true);
@@ -1232,8 +1302,18 @@
                 if (response.ok) {
                     const res = await response.json();
                     showToast(`¡Ingreso registrado! Stock total: ${res.stock_total}`);
-                    // Refrescar los datos en pantalla
-                    queryBarcode(barcode || sku);
+                    
+                    // Refrescar los datos en pantalla sin robar el foco
+                    queryBarcode(barcode || sku, false);
+                    
+                    // Limpiar y enfocar input principal de inmediato si estamos en modo pistola
+                    if (desktopScannerMode) {
+                        const mainInput = document.getElementById("searchBarcodeVal");
+                        if (mainInput) {
+                            mainInput.value = "";
+                            mainInput.focus();
+                        }
+                    }
                 } else {
                     const err = await response.json();
                     showToast(err.detail || "Error al registrar ingreso de stock", true);
@@ -1299,7 +1379,17 @@
                         }
                     }
                     
-                    queryBarcode(barcode || sku);
+                    // Refrescar los datos en pantalla sin robar el foco
+                    queryBarcode(barcode || sku, false);
+                    
+                    // Limpiar y enfocar input principal para el siguiente escaneo
+                    if (desktopScannerMode) {
+                        const mainInput = document.getElementById("searchBarcodeVal");
+                        if (mainInput) {
+                            mainInput.value = "";
+                            mainInput.focus();
+                        }
+                    }
                 } else {
                     const err = await response.json();
                     showToast(err.detail || "Error al guardar producto", true);
