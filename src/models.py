@@ -118,10 +118,13 @@ def get_db_path() -> str:
 
 def get_db_engine(db_path: str = None):
     """
-    Crea y retorna el engine de SQLAlchemy para la base de datos SQLite.
+    Crea y retorna el engine de SQLAlchemy para la base de datos (SQLite o PostgreSQL).
     """
     if db_path is None:
         db_path = get_db_path()
+        
+    if db_path.startswith("sqlite://") or db_path.startswith("postgresql://") or db_path.startswith("postgres://"):
+        return create_engine(db_path, echo=False)
         
     db_dir = os.path.dirname(db_path)
     if db_dir:
